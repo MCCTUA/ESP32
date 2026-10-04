@@ -7,3 +7,8 @@
 // https://api.telegram.org/bot<TOKEN>/getUpdates
 #define TELEGRAM_BOT_TOKEN "your_bot_token_here"
 #define TELEGRAM_CHAT_ID "your_chat_id_here"
+
+// MQTT (HiveMQ public broker: broker.hivemq.com ไม่มีรหัสผ่าน ใครก็ publish/subscribe ได้)
+// BOARD_ID ต้องไม่ซ้ำกันในแต่ละบอร์ด (และไม่ซ้ำคนอื่นบน public broker) — topic คือ esp32relay/<BOARD_ID>/telemetry และ .../control
+// ปล่อยเป็น "" เพื่อใช้ค่าจาก MAC address ของบอร์ด (เช่น esp32-a1b2c3d4)
+#define BOARD_ID "board-xxxxxxxx"

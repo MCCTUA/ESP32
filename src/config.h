@@ -13,3 +13,8 @@ constexpr float ALERT_PM25_HYSTERESIS = 2.0f;
 
 // ส่งสรุปสภาพอากาศเป็นรอบ ทุกกี่มิลลิวินาที ใส่ 0 = ปิด
 constexpr unsigned long REPORT_INTERVAL_MS = 60UL * 60UL * 1000UL;
+
+// NTP: เวลาจริงตามเขตเวลา Asia/Bangkok (POSIX TZ: ICT = UTC+7 ไม่มี DST)
+constexpr const char *NTP_TZ = "ICT-7";
+constexpr const char *NTP_SERVER1 = "th.pool.ntp.org";
+constexpr const char *NTP_SERVER2 = "pool.ntp.org";

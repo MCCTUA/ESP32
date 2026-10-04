@@ -4,6 +4,7 @@
 
 #include "config.h"
 #include "display.h"
+#include "mqtt.h"
 #include "telegram.h"
 #include "weather.h"
 
@@ -26,6 +27,8 @@ bool aqiAlerting = false;  // AQI อยู่ในช่วงเกินเ�
 bool pm25Alerting = false; // PM2.5 อยู่ในช่วงเกินเกณฑ์ (แจ้งไปแล้ว)
 
 bool relayOn[CHANNEL_COUNT] = {false, false, false}; // สถานะรีเลย์แต่ละตัว
+bool telemetryDirty = true;                          // มีข้อมูลใหม่ที่ยังไม่ได้ส่ง MQTT
+uint32_t publishedWeatherVersion = 0;
 
 // ข้อมูล debounce ของสวิตช์แต่ละตัว
 bool lastReading[CHANNEL_COUNT];       // ค่าที่อ่านได้ล่าสุด (ยังไม่ผ่าน debounce)
@@ -37,7 +40,18 @@ void setRelay(uint8_t index, bool on)
 {
     relayOn[index] = on;
     digitalWrite(RELAY_PINS[index], on ? RELAY_ON : RELAY_OFF);
+    telemetryDirty = true;
     telegramNotify(String("Relay ") + (index + 1) + ": " + (on ? "ON" : "OFF"));
+}
+
+// คำสั่งจาก MQTT topic control
+void onMqttControl(uint8_t index, int8_t state)
+{
+    if (index >= CHANNEL_COUNT)
+        return;
+    bool on = state < 0 ? !relayOn[index] : state > 0;
+    if (on != relayOn[index])
+        setRelay(index, on);
 }
 
 // ส่งสรุปสภาพอากาศเป็นรอบ และแจ้งเตือนเมื่อ AQI / PM2.5 เกินเกณฑ์ใน config.h (แจ้งตอนข้ามเกณฑ์ และตอนกลับเป็นปกติ)
@@ -109,6 +123,8 @@ void setup()
     // WiFi: ถ้ายังไม่เคยตั้งค่า จะเปิด AP "ESP32-Relay" ให้เชื่อมต่อแล้วตั้งค่า WiFi ผ่านเว็บ (192.168.4.1)
     // ใช้โหมด non-blocking เพื่อให้สวิตช์/รีเลย์ทำงานได้ระหว่างรอ WiFi
     WiFi.mode(WIFI_STA);
+    configTzTime(NTP_TZ, NTP_SERVER1, NTP_SERVER2); // sync เวลาอัตโนมัติเมื่อมีเน็ต และซ้ำเป็นระยะ
+    mqttInit(onMqttControl);
     wm.setConfigPortalBlocking(false);
     if (wm.autoConnect("ESP32-Relay"))
     {
@@ -142,6 +158,18 @@ void loop()
     weatherUpdate(); // ดึงสภาพอากาศ/AQI ทุก 2 นาที
     weatherReport(now);
     telegramUpdate(); // ส่งข้อความที่ค้างในคิว
+
+    mqttUpdate();
+    if (mqttJustConnected() || weather.version != publishedWeatherVersion)
+    {
+        publishedWeatherVersion = weather.version;
+        telemetryDirty = true;
+    }
+    if (telemetryDirty && mqttConnected())
+    {
+        mqttPublishTelemetry(relayOn, CHANNEL_COUNT);
+        telemetryDirty = false;
+    }
     displayUpdate(wifiConnected);
 
     for (uint8_t i = 0; i < CHANNEL_COUNT; i++)
