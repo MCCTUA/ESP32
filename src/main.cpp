@@ -13,6 +13,7 @@ const uint8_t RELAY_PINS[3] = {17, 18, 4}; // relay1, relay2, relay3
 const uint8_t SW_PINS[3] = {34, 35, 32};   // SW1, SW2, SW3
 const uint8_t CHANNEL_COUNT = sizeof(RELAY_PINS) / sizeof(RELAY_PINS[0]);
 const unsigned long DEBOUNCE_MS = 30; // เวลาที่สัญญาณต้องนิ่งก่อนยอมรับ
+const unsigned long WIFI_RESET_HOLD_MS = 5000; // กด SW1 ค้างเท่านี้ = ล้างการตั้งค่า WiFi
 
 WiFiManager wm;
 bool wifiWasConnected = false;
@@ -23,6 +24,7 @@ bool relayOn[CHANNEL_COUNT] = {false, false, false}; // สถานะรีเ
 bool lastReading[CHANNEL_COUNT];       // ค่าที่อ่านได้ล่าสุด (ยังไม่ผ่าน debounce)
 bool stableState[CHANNEL_COUNT];       // ค่าที่นิ่งแล้ว
 unsigned long lastChangeMs[CHANNEL_COUNT]; // เวลาที่ค่าที่อ่านได้เปลี่ยนล่าสุด
+unsigned long sw1PressedMs = 0;            // เวลาที่ SW1 ถูกกด (ที่ผ่าน debounce แล้ว)
 
 void setRelay(uint8_t index, bool on)
 {
@@ -100,7 +102,19 @@ void loop()
             if (stableState[i] == SW_PRESSED)
             {
                 setRelay(i, !relayOn[i]);
+                if (i == 0)
+                    sw1PressedMs = now;
             }
         }
+    }
+
+    // กด SW1 ค้างครบเวลา: ล้างค่า WiFi ที่บันทึกไว้ แล้วรีสตาร์ทเพื่อเปิด config portal
+    if (stableState[0] == SW_PRESSED && (now - sw1PressedMs) >= WIFI_RESET_HOLD_MS)
+    {
+        Serial.println("SW1 held 5s: reset WiFi settings, restarting");
+        displayMessage("Reset WiFi...");
+        wm.resetSettings();
+        delay(500);
+        ESP.restart();
     }
 }

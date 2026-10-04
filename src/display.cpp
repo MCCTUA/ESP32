@@ -92,3 +92,15 @@ void displayUpdate(bool wifiConnected)
     oled.printf("PM2.5 %.0f PM10 %.0f", weather.pm25, weather.pm10);
     oled.display();
 }
+
+void displayMessage(const char *text)
+{
+    if (!oledReady)
+        return;
+    oled.clearDisplay();
+    oled.setTextSize(2);
+    oled.setCursor(0, 20);
+    oled.println(text);
+    oled.display();
+    drawnVersion = UINT32_MAX; // บังคับให้วาดหน้าปกติใหม่รอบหน้า
+}
