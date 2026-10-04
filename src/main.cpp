@@ -2,7 +2,9 @@
 #include <WiFi.h>
 #include <WiFiManager.h>
 
+#include "config.h"
 #include "display.h"
+#include "telegram.h"
 #include "weather.h"
 
 #define RELAY_ON LOW // รีเลย์เป็นแบบ Active LOW
@@ -17,6 +19,11 @@ const unsigned long WIFI_RESET_HOLD_MS = 5000; // กด SW1 ค้างเท�
 
 WiFiManager wm;
 bool wifiWasConnected = false;
+uint32_t reportedWeatherVersion = 0; // version ของข้อมูลอากาศที่ส่งสรุปไปล่าสุด
+unsigned long lastReportMs = 0;
+bool reportedOnce = false;
+bool aqiAlerting = false;  // AQI อยู่ในช่วงเกินเกณฑ์ (แจ้งไปแล้ว)
+bool pm25Alerting = false; // PM2.5 อยู่ในช่วงเกินเกณฑ์ (แจ้งไปแล้ว)
 
 bool relayOn[CHANNEL_COUNT] = {false, false, false}; // สถานะรีเลย์แต่ละตัว
 
@@ -30,6 +37,56 @@ void setRelay(uint8_t index, bool on)
 {
     relayOn[index] = on;
     digitalWrite(RELAY_PINS[index], on ? RELAY_ON : RELAY_OFF);
+    telegramNotify(String("Relay ") + (index + 1) + ": " + (on ? "ON" : "OFF"));
+}
+
+// ส่งสรุปสภาพอากาศเป็นรอบ และแจ้งเตือนเมื่อ AQI / PM2.5 เกินเกณฑ์ใน config.h (แจ้งตอนข้ามเกณฑ์ และตอนกลับเป็นปกติ)
+void weatherReport(unsigned long now)
+{
+    if (!weather.valid || weather.version == reportedWeatherVersion)
+        return;
+    reportedWeatherVersion = weather.version;
+
+    String summary = String("Nonthaburi: ") + weather.description + "\nTemp " + String(weather.temp, 1) +
+                     " C (feels " + String(weather.feelsLike, 1) + "), RH " + weather.humidity + "%\nAQI " +
+                     weather.aqi + ", PM2.5 " + String(weather.pm25, 1) + ", PM10 " + String(weather.pm10, 1) +
+                     " ug/m3";
+    bool alerted = false;
+
+    if (ALERT_AQI_LEVEL > 0)
+    {
+        bool over = weather.aqi >= ALERT_AQI_LEVEL;
+        if (over != aqiAlerting)
+        {
+            aqiAlerting = over;
+            telegramNotify(String(over ? "ALERT: AQI " : "OK: AQI back to ") + weather.aqi +
+                           " (threshold " + ALERT_AQI_LEVEL + ")\n" + summary);
+            alerted = true;
+        }
+    }
+
+    if (ALERT_PM25_UGM3 > 0)
+    {
+        bool over = pm25Alerting ? weather.pm25 > ALERT_PM25_UGM3 - ALERT_PM25_HYSTERESIS
+                                 : weather.pm25 >= ALERT_PM25_UGM3;
+        if (over != pm25Alerting)
+        {
+            pm25Alerting = over;
+            if (!alerted) // ถ้า AQI เพิ่งแจ้งพร้อมสรุปไปแล้ว ไม่ส่งซ้ำ
+                telegramNotify(String(over ? "ALERT: PM2.5 " : "OK: PM2.5 back to ") + String(weather.pm25, 1) +
+                               " ug/m3 (threshold " + String(ALERT_PM25_UGM3, 1) + ")\n" + summary);
+            alerted = true;
+        }
+    }
+
+    bool periodicDue = REPORT_INTERVAL_MS > 0 && (!reportedOnce || (now - lastReportMs) >= REPORT_INTERVAL_MS);
+    if (periodicDue && !alerted)
+        telegramNotify(summary);
+    if (periodicDue || alerted)
+    {
+        lastReportMs = now;
+        reportedOnce = true;
+    }
 }
 
 void setup()
@@ -74,12 +131,17 @@ void loop()
     {
         wifiWasConnected = wifiConnected;
         if (wifiConnected)
+        {
             Serial.printf("WiFi connected: %s\n", WiFi.localIP().toString().c_str());
+            telegramNotify(String("ESP32 online, IP ") + WiFi.localIP().toString());
+        }
         else
             Serial.println("WiFi disconnected");
     }
 
     weatherUpdate(); // ดึงสภาพอากาศ/AQI ทุก 2 นาที
+    weatherReport(now);
+    telegramUpdate(); // ส่งข้อความที่ค้างในคิว
     displayUpdate(wifiConnected);
 
     for (uint8_t i = 0; i < CHANNEL_COUNT; i++)
