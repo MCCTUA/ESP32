@@ -128,7 +128,41 @@ void setup() {
 - GPIO4 อยู่บน ADC2 จึงใช้อ่านค่า analog ร่วมกับ Wi-Fi ไม่ได้ (ใช้เป็น output ปกติ)
 - ขา OLED (GPIO21/22) ไม่ชนกับขารีเลย์
 
-## 9. ข้อควรระวังทั่วไป
+## 9. Switch
+
+**ชนิด: Active LOW + External pull-up** (กด = `LOW`, ปล่อย = `HIGH`)
+
+| Switch | GPIO |
+|---|---|
+| SW1 | GPIO34 |
+| SW2 | GPIO35 |
+| SW3 | GPIO32 |
+
+ตัวอย่างโค้ด:
+
+```cpp
+#define SW_PRESSED LOW
+
+const uint8_t SW_PINS[3] = {34, 35, 32};
+
+void setup() {
+  for (uint8_t pin : SW_PINS) {
+    pinMode(pin, INPUT);  // มี external pull-up แล้ว ไม่ต้องใช้ INPUT_PULLUP
+  }
+}
+
+bool isPressed(uint8_t index) {
+  return digitalRead(SW_PINS[index]) == SW_PRESSED;
+}
+```
+
+ข้อสังเกต:
+- GPIO34 และ GPIO35 เป็น Input only และไม่มี pull-up ภายใน จึงต้องพึ่ง external pull-up บนบอร์ด (ใช้ `INPUT_PULLUP` กับสองขานี้ไม่ได้ผล)
+- ใช้ `pinMode(pin, INPUT)` กับทั้ง 3 ขาเพื่อให้โค้ดเหมือนกัน
+- ควรทำ debounce ในโค้ด (เช่น หน่วงประมาณ 20–50 ms) เพราะปุ่มกดมีอาการสัญญาณเด้ง
+- ขา switch ไม่ชนกับขารีเลย์ (17, 18, 4) และ OLED (21, 22)
+
+## 10. ข้อควรระวังทั่วไป
 
 - GPIO ทน 3.3 V เท่านั้น ถ้าต่ออุปกรณ์ 5 V ต้องใช้ level shifter หรือวงจรแบ่งแรงดัน
 - GPIO แต่ละขาจ่ายกระแสได้ประมาณ 12 mA (สูงสุดไม่ควรเกิน 20 mA)
@@ -136,7 +170,7 @@ void setup() {
 - ถ้าบอร์ดรีเซ็ตเองบ่อย (brownout) ให้ลองเปลี่ยนสาย USB หรือเพิ่มตัวเก็บประจุ 10–100 µF ที่ขา 3V3 / EN
 - ห้ามจ่าย 5 V เข้าขา 3V3 โดยตรง
 
-## 10. แหล่งข้อมูลอ้างอิง
+## 11. แหล่งข้อมูลอ้างอิง
 
 - ESP32 Datasheet: https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf
 - ESP32 Technical Reference Manual: https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf
