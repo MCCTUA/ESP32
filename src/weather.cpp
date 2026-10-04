@@ -50,7 +50,7 @@ static bool fetchJson(const String &url, JsonDocument &doc)
 static bool fetchWeather()
 {
     String query = String("?lat=") + WEATHER_LAT + "&lon=" + WEATHER_LON +
-                   "&units=metric&lang=th&appid=" + OPENWEATHER_API_KEY;
+                   "&units=metric&lang=en&appid=" + OPENWEATHER_API_KEY;
 
     JsonDocument weatherDoc;
     if (!fetchJson("https://api.openweathermap.org/data/2.5/weather" + query, weatherDoc))
@@ -70,6 +70,7 @@ static bool fetchWeather()
     weather.pm25 = air["components"]["pm2_5"] | 0.0f;
     weather.pm10 = air["components"]["pm10"] | 0.0f;
     weather.valid = true;
+    weather.version++;
     return true;
 }
 

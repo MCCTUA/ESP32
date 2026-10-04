@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <WiFiManager.h>
 
+#include "display.h"
 #include "weather.h"
 
 #define RELAY_ON LOW // รีเลย์เป็นแบบ Active LOW
@@ -32,6 +33,7 @@ void setRelay(uint8_t index, bool on)
 void setup()
 {
     Serial.begin(115200);
+    displayInit();
 
     for (uint8_t i = 0; i < CHANNEL_COUNT; i++)
     {
@@ -76,6 +78,7 @@ void loop()
     }
 
     weatherUpdate(); // ดึงสภาพอากาศ/AQI ทุก 2 นาที
+    displayUpdate(wifiConnected);
 
     for (uint8_t i = 0; i < CHANNEL_COUNT; i++)
     {

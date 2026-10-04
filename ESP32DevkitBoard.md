@@ -162,7 +162,64 @@ bool isPressed(uint8_t index) {
 - ควรทำ debounce ในโค้ด (เช่น หน่วงประมาณ 20–50 ms) เพราะปุ่มกดมีอาการสัญญาณเด้ง
 - ขา switch ไม่ชนกับขารีเลย์ (17, 18, 4) และ OLED (21, 22)
 
-## 10. ข้อควรระวังทั่วไป
+## 10. OLED 0.96" (I2C, SSD1306)
+
+| หัวข้อ | รายละเอียด |
+|---|---|
+| ไดรเวอร์ | SSD1306 |
+| ความละเอียด | 128 x 64 พิกเซล (บางรุ่น 128 x 32) |
+| สี | โมโนโครม (ขาว / ฟ้า / เหลือง-ฟ้า ตามรุ่น) |
+| อินเทอร์เฟซ | I2C (4 ขา) |
+| I2C address | 0x3C (บางรุ่นเป็น 0x3D ดูตัวต้านทานเลือก address ด้านหลังโมดูล) |
+| แรงดันไฟ | 3.3 V (โมดูลส่วนใหญ่รับได้ 3.3–5 V แต่บน ESP32 ควรใช้ 3.3 V) |
+| กระแส | ประมาณ 10–20 mA |
+
+การต่อสาย:
+
+| OLED | ESP32 |
+|---|---|
+| VCC | 3V3 |
+| GND | GND |
+| SDA | GPIO21 |
+| SCL | GPIO22 |
+
+ตัวอย่างโค้ด (Adafruit SSD1306 + Adafruit GFX):
+
+```cpp
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH  128
+#define SCREEN_HEIGHT 64
+#define OLED_ADDR     0x3C
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);  // -1 = ไม่มีขา reset
+
+void setup() {
+  Wire.begin(21, 22);  // SDA, SCL
+  if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) {
+    Serial.println("SSD1306 not found");
+    for (;;);
+  }
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println("Hello ESP32");
+  display.display();  // ต้องเรียกเพื่อส่งข้อมูลขึ้นจอ
+}
+```
+
+ข้อสังเกต:
+- ถ้าจอไม่ติด ให้สแกนหา address ด้วย I2C scanner (`Wire.beginTransmission(addr)`) เพราะอาจเป็น 0x3D
+- ขา I2C มี pull-up บนโมดูล OLED อยู่แล้วโดยปกติ ไม่ต้องเพิ่มตัวต้านทานภายนอก
+- ตัวอักษรไทยไม่รองรับในฟอนต์มาตรฐานของ Adafruit GFX (ต้องใช้ฟอนต์/บิตแมปเพิ่มเอง)
+- `display.display()` ส่งทั้งเฟรมผ่าน I2C ใช้เวลาประมาณ 20–30 ms ที่ 400 kHz ควรเรียกเมื่อข้อมูลเปลี่ยนเท่านั้น ไม่ควรเรียกถี่ใน `loop()` ที่ต้องตอบสนองเร็ว
+- เพิ่มความเร็วบัสได้ด้วย `Wire.setClock(400000);`
+- GPIO21/22 ไม่ชนกับขารีเลย์ (17, 18, 4) และ switch (34, 35, 32)
+
+## 11. ข้อควรระวังทั่วไป
 
 - GPIO ทน 3.3 V เท่านั้น ถ้าต่ออุปกรณ์ 5 V ต้องใช้ level shifter หรือวงจรแบ่งแรงดัน
 - GPIO แต่ละขาจ่ายกระแสได้ประมาณ 12 mA (สูงสุดไม่ควรเกิน 20 mA)
@@ -170,7 +227,7 @@ bool isPressed(uint8_t index) {
 - ถ้าบอร์ดรีเซ็ตเองบ่อย (brownout) ให้ลองเปลี่ยนสาย USB หรือเพิ่มตัวเก็บประจุ 10–100 µF ที่ขา 3V3 / EN
 - ห้ามจ่าย 5 V เข้าขา 3V3 โดยตรง
 
-## 11. แหล่งข้อมูลอ้างอิง
+## 12. แหล่งข้อมูลอ้างอิง
 
 - ESP32 Datasheet: https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf
 - ESP32 Technical Reference Manual: https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf

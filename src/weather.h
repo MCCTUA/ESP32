@@ -5,7 +5,8 @@
 struct WeatherData
 {
     bool valid = false;
-    String description; // คำอธิบายสภาพอากาศ (ภาษาไทย)
+    uint32_t version = 0; // เพิ่มทุกครั้งที่ดึงข้อมูลสำเร็จ (ใช้ตรวจว่าต้องวาดจอใหม่)
+    String description; // คำอธิบายสภาพอากาศ (ภาษาอังกฤษ เพราะฟอนต์ OLED ไม่รองรับไทย)
     float temp;         // °C
     float feelsLike;    // °C
     int humidity;       // %
