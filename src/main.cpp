@@ -2,6 +2,8 @@
 #include <WiFi.h>
 #include <WiFiManager.h>
 
+#include "weather.h"
+
 #define RELAY_ON LOW // รีเลย์เป็นแบบ Active LOW
 #define RELAY_OFF HIGH
 #define SW_PRESSED LOW // สวิตช์เป็นแบบ Active LOW + external pull-up
@@ -72,6 +74,8 @@ void loop()
         else
             Serial.println("WiFi disconnected");
     }
+
+    weatherUpdate(); // ดึงสภาพอากาศ/AQI ทุก 2 นาที
 
     for (uint8_t i = 0; i < CHANNEL_COUNT; i++)
     {
