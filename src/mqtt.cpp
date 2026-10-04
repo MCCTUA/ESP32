@@ -24,25 +24,48 @@ static String topicControl;
 // คำสั่งเป็น JSON: {"relay":1,"state":"on"|"off"|"toggle"} (relay 1-3)
 static void onMessage(char *topic, uint8_t *payload, unsigned int length)
 {
+    String body;
+    body.reserve(length);
+    for (unsigned int i = 0; i < length; i++)
+        body += (char)payload[i];
+    Serial.printf("MQTT rx [%s]: %s\n", topic, body.c_str());
+
     JsonDocument doc;
-    if (deserializeJson(doc, payload, length) || !controlHandler)
+    if (deserializeJson(doc, body) || !doc.is<JsonObject>() || !controlHandler)
     {
-        Serial.println("MQTT control: invalid payload");
+        Serial.println("MQTT control: invalid payload (ต้องเป็น JSON เช่น {\"relay\":1,\"state\":\"on\"})");
         return;
     }
-    int relay = doc["relay"] | 0;
-    String state = doc["state"] | "";
+    // relay รับได้ทั้งตัวเลขและสตริง ("1")
+    int relay = doc["relay"].is<const char *>() ? atoi(doc["relay"].as<const char *>()) : (doc["relay"] | 0);
+
     int8_t value;
-    if (state == "on")
-        value = 1;
-    else if (state == "off")
-        value = 0;
-    else if (state == "toggle")
-        value = -1;
+    JsonVariant s = doc["state"];
+    if (s.is<bool>())
+        value = s.as<bool>() ? 1 : 0;
+    else if (s.is<int>())
+        value = s.as<int>() ? 1 : 0;
     else
-        return;
+    {
+        String st = s | "";
+        st.toLowerCase();
+        st.trim();
+        if (st == "on" || st == "1" || st == "true")
+            value = 1;
+        else if (st == "off" || st == "0" || st == "false")
+            value = 0;
+        else if (st == "toggle")
+            value = -1;
+        else
+        {
+            Serial.println("MQTT control: unknown state");
+            return;
+        }
+    }
     if (relay >= 1 && relay <= 255)
         controlHandler(relay - 1, value);
+    else
+        Serial.println("MQTT control: invalid relay number");
 }
 
 void mqttInit(RelayControlHandler handler)
@@ -86,9 +109,9 @@ void mqttUpdate()
 
     if (client.connect(boardId.c_str())) // client id = board id กันชนกันบน broker; ไม่มี user/password
     {
-        client.subscribe(topicControl.c_str());
+        bool ok = client.subscribe(topicControl.c_str());
         justConnected = true;
-        Serial.printf("MQTT connected: %s\n", MQTT_HOST);
+        Serial.printf("MQTT connected: %s, subscribe %s: %s\n", MQTT_HOST, topicControl.c_str(), ok ? "ok" : "FAILED");
     }
     else
         Serial.printf("MQTT connect failed, rc=%d\n", client.state());
