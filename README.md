@@ -31,14 +31,20 @@
 .
 ├── platformio.ini          # ตั้งค่าบอร์ด, พอร์ต, ไลบรารี
 ├── ESP32DevkitBoard.md     # ข้อมูลบอร์ดและอุปกรณ์ต่อพ่วง
+├── include/                # header files (*.h)
+│   ├── weather.h
+│   ├── display.h
+│   ├── telegram.h
+│   ├── mqtt.h
+│   ├── config.h            # เกณฑ์แจ้งเตือนและรอบสรุปของ Telegram
+│   ├── secrets.example.h   # ตัวอย่างไฟล์เก็บ API key และ Telegram token
+│   └── secrets.h           # API key/token จริง (ถูก ignore ไม่ขึ้น git)
 └── src/
     ├── main.cpp            # setup/loop: WiFi, สวิตช์, รีเลย์, รีเซ็ต WiFi
-    ├── weather.h/.cpp      # ดึงและ parse ข้อมูล OpenWeather
-    ├── display.h/.cpp      # วาดข้อมูลบนจอ OLED
-    ├── telegram.h/.cpp     # คิวและส่งข้อความ Telegram
-    ├── config.h            # เกณฑ์แจ้งเตือนและรอบสรุปของ Telegram
-    ├── secrets.example.h   # ตัวอย่างไฟล์เก็บ API key และ Telegram token
-    └── secrets.h           # API key/token จริง (ถูก ignore ไม่ขึ้น git)
+    ├── weather.cpp         # ดึงและ parse ข้อมูล OpenWeather
+    ├── display.cpp         # วาดข้อมูลบนจอ OLED
+    ├── telegram.cpp        # คิวและส่งข้อความ Telegram
+    └── mqtt.cpp            # MQTT (HiveMQ) telemetry/control
 ```
 
 ## 4. การติดตั้งและเปิดโปรเจกต์ด้วย VS Code
@@ -52,7 +58,7 @@
 ### ตั้งค่า API key
 
 1. สมัครรับ API key ที่ https://openweathermap.org/api (ต้องมี key ที่เรียก Current Weather และ Air Pollution ได้)
-2. คัดลอก `src/secrets.example.h` เป็น `src/secrets.h`
+2. คัดลอก `include/secrets.example.h` เป็น `include/secrets.h`
 3. แก้ค่า `OPENWEATHER_API_KEY` เป็น key จริง ไฟล์นี้ถูกใส่ใน `.gitignore` จึงไม่ถูก commit
 
 ### ตั้งค่า Telegram
@@ -60,14 +66,14 @@
 1. คุยกับ [@BotFather](https://t.me/BotFather) ส่ง `/newbot` เพื่อสร้างบอตและรับ **token**
 2. เปิดแชตกับบอตที่สร้างแล้วส่งข้อความอะไรก็ได้หนึ่งข้อความ (หรือเพิ่มบอตเข้ากลุ่ม)
 3. เปิด `https://api.telegram.org/bot<TOKEN>/getUpdates` ในเบราว์เซอร์ แล้วดูค่า `chat.id` ในผลลัพธ์
-4. ใส่ค่าใน `src/secrets.h`:
+4. ใส่ค่าใน `include/secrets.h`:
 
 ```cpp
 #define TELEGRAM_BOT_TOKEN "123456:ABC..."
 #define TELEGRAM_CHAT_ID "your_chat_id"
 ```
 
-ปรับเกณฑ์แจ้งเตือนและรอบสรุปได้ที่ `src/config.h` (ดูหัวข้อ "ค่าที่ปรับแต่งได้")
+ปรับเกณฑ์แจ้งเตือนและรอบสรุปได้ที่ `include/config.h` (ดูหัวข้อ "ค่าที่ปรับแต่งได้")
 
 ### Build / Upload / Monitor
 
@@ -134,10 +140,10 @@ Telegram ไม่ใช้ไลบรารีเพิ่ม เรียก 
 | `HTTP_TIMEOUT_MS` | `src/weather.cpp` | timeout ของ HTTP (5 วินาที) |
 | `DEBOUNCE_MS` | `src/main.cpp` | เวลา debounce สวิตช์ (30 ms) |
 | `WIFI_RESET_HOLD_MS` | `src/main.cpp` | เวลากด SW1 ค้างเพื่อรีเซ็ต WiFi (5000 ms) |
-| `ALERT_AQI_LEVEL` | `src/config.h` | แจ้งเตือนเมื่อ AQI ≥ ค่านี้ (ค่าเริ่มต้น 4, 0 = ปิด) |
-| `ALERT_PM25_UGM3` | `src/config.h` | แจ้งเตือนเมื่อ PM2.5 ≥ ค่านี้ (37.5 µg/m³, 0 = ปิด) |
-| `ALERT_PM25_HYSTERESIS` | `src/config.h` | PM2.5 ต้องต่ำกว่าเกณฑ์เท่านี้ถึงถือว่ากลับเป็นปกติ (2.0) |
-| `REPORT_INTERVAL_MS` | `src/config.h` | รอบส่งสรุปสภาพอากาศ (1 ชั่วโมง, 0 = ปิด) |
+| `ALERT_AQI_LEVEL` | `include/config.h` | แจ้งเตือนเมื่อ AQI ≥ ค่านี้ (ค่าเริ่มต้น 4, 0 = ปิด) |
+| `ALERT_PM25_UGM3` | `include/config.h` | แจ้งเตือนเมื่อ PM2.5 ≥ ค่านี้ (37.5 µg/m³, 0 = ปิด) |
+| `ALERT_PM25_HYSTERESIS` | `include/config.h` | PM2.5 ต้องต่ำกว่าเกณฑ์เท่านี้ถึงถือว่ากลับเป็นปกติ (2.0) |
+| `REPORT_INTERVAL_MS` | `include/config.h` | รอบส่งสรุปสภาพอากาศ (1 ชั่วโมง, 0 = ปิด) |
 | `QUEUE_SIZE`, `RETRY_DELAY_MS` | `src/telegram.cpp` | ขนาดคิวข้อความ (6, คิวเต็มทิ้งข้อความเก่าสุด) และเวลารอก่อนส่งซ้ำ (10 วินาที) |
 | `OLED_ADDR` | `src/display.cpp` | I2C address ของจอ (`0x3C` หรือ `0x3D`) |
 | `RELAY_PINS`, `SW_PINS` | `src/main.cpp` | ขาของรีเลย์และสวิตช์ |
@@ -148,9 +154,9 @@ Telegram ไม่ใช้ไลบรารีเพิ่ม เรียก 
 |---|---|
 | จอ OLED ไม่ติด | ตรวจสาย SDA/SCL, ลองเปลี่ยน `OLED_ADDR` เป็น `0x3D`, ดู Serial ว่าขึ้น "OLED init failed" หรือไม่ |
 | ไม่เห็นพอร์ต / อัปโหลดไม่ได้ | เปลี่ยนสาย USB เป็นแบบมีสายข้อมูล, ติดตั้งไดรเวอร์ CH340/CP210x, กด BOOT ค้างตอนอัปโหลด, แก้ `upload_port` |
-| ดึงสภาพอากาศไม่ได้ ("OpenWeather HTTP error") | ตรวจ API key ใน `src/secrets.h` (key ใหม่อาจใช้เวลาสักพักก่อนทำงาน) และการเชื่อมต่ออินเทอร์เน็ต |
+| ดึงสภาพอากาศไม่ได้ ("OpenWeather HTTP error") | ตรวจ API key ใน `include/secrets.h` (key ใหม่อาจใช้เวลาสักพักก่อนทำงาน) และการเชื่อมต่ออินเทอร์เน็ต |
 | บอร์ดรีเซ็ตเองบ่อย (brownout) | ใช้แหล่งจ่ายไฟ/สาย USB ที่จ่ายกระแสได้พอ หรือเพิ่มตัวเก็บประจุ 10–100 µF ที่ขา 3V3 |
-| build ไม่ผ่านเพราะไม่มี `secrets.h` | คัดลอกจาก `src/secrets.example.h` ตามหัวข้อ "ตั้งค่า API key" |
+| build ไม่ผ่านเพราะไม่มี `secrets.h` | คัดลอกจาก `include/secrets.example.h` ตามหัวข้อ "ตั้งค่า API key" |
 | Telegram ไม่ส่งข้อความ ("Telegram HTTP error") | 401 = token ผิด, 400 = chat id ผิด หรือยังไม่เคยส่งข้อความหาบอต (ต้องส่งก่อนหนึ่งครั้ง), 404 = token รูปแบบผิด; ตรวจว่า WiFi เชื่อมต่ออยู่ |
 | Flash ใกล้เต็ม | ตอนนี้ใช้ประมาณ 81% (WiFi + HTTPS ใช้พื้นที่มาก) ควรระวังเมื่อเพิ่มฟีเจอร์ |
 
